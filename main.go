@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"github.com/aldngrha/ecommerce-be/internal/handler"
-	"github.com/aldngrha/ecommerce-be/package/database"
+	grpcmiddleware "github.com/aldngrha/ecommerce-be/middleware/grpc"
 	"github.com/aldngrha/ecommerce-be/pb/service"
+	"github.com/aldngrha/ecommerce-be/pkg/database"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -27,7 +28,11 @@ func main() {
 
 	serviceHandler := handler.NewServiceHandler()
 
-	serv := grpc.NewServer()
+	serv := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			grpcmiddleware.ErrorMiddleware,
+		),
+	)
 
 	service.RegisterHelloWorldServiceServer(serv, serviceHandler)
 
