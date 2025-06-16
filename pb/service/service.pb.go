@@ -7,6 +7,7 @@
 package service
 
 import (
+	common "github.com/aldngrha/ecommerce-be/pb/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -67,7 +68,8 @@ func (x *HelloRequest) GetName() string {
 
 type HelloResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	Base          *common.BaseResponse   `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,6 +104,13 @@ func (*HelloResponse) Descriptor() ([]byte, []int) {
 	return file_service_service_proto_rawDescGZIP(), []int{1}
 }
 
+func (x *HelloResponse) GetBase() *common.BaseResponse {
+	if x != nil {
+		return x.Base
+	}
+	return nil
+}
+
 func (x *HelloResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
@@ -113,11 +122,12 @@ var File_service_service_proto protoreflect.FileDescriptor
 
 const file_service_service_proto_rawDesc = "" +
 	"\n" +
-	"\x15service/service.proto\x12\aservice\"\"\n" +
+	"\x15service/service.proto\x12\aservice\x1a\x1acommon/base_response.proto\"\"\n" +
 	"\fHelloRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\")\n" +
-	"\rHelloResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2N\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"S\n" +
+	"\rHelloResponse\x12(\n" +
+	"\x04base\x18\x01 \x01(\v2\x14.common.BaseResponseR\x04base\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2N\n" +
 	"\x11HelloWorldService\x129\n" +
 	"\bSayHello\x12\x15.service.HelloRequest\x1a\x16.service.HelloResponseB-Z+github.com/aldngrha/ecommerce-be/pb/serviceb\x06proto3"
 
@@ -135,17 +145,19 @@ func file_service_service_proto_rawDescGZIP() []byte {
 
 var file_service_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_service_service_proto_goTypes = []any{
-	(*HelloRequest)(nil),  // 0: service.HelloRequest
-	(*HelloResponse)(nil), // 1: service.HelloResponse
+	(*HelloRequest)(nil),        // 0: service.HelloRequest
+	(*HelloResponse)(nil),       // 1: service.HelloResponse
+	(*common.BaseResponse)(nil), // 2: common.BaseResponse
 }
 var file_service_service_proto_depIdxs = []int32{
-	0, // 0: service.HelloWorldService.SayHello:input_type -> service.HelloRequest
-	1, // 1: service.HelloWorldService.SayHello:output_type -> service.HelloResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: service.HelloResponse.base:type_name -> common.BaseResponse
+	0, // 1: service.HelloWorldService.SayHello:input_type -> service.HelloRequest
+	1, // 2: service.HelloWorldService.SayHello:output_type -> service.HelloResponse
+	2, // [2:3] is the sub-list for method output_type
+	1, // [1:2] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_service_service_proto_init() }

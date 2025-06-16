@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"github.com/aldngrha/ecommerce-be/internal/utils"
 	"github.com/aldngrha/ecommerce-be/pb/service"
 )
 
@@ -13,6 +14,7 @@ type serviceHandler struct {
 func (h *serviceHandler) SayHello(ctx context.Context, req *service.HelloRequest) (*service.HelloResponse, error) {
 	return &service.HelloResponse{
 		Message: fmt.Sprintf("Hello %s", req.Name),
+		Base:    utils.SuccessResponse("Successfully processed request"),
 	}, nil
 }
 

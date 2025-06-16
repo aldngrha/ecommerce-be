@@ -18,7 +18,7 @@ func main() {
 	ctx := context.Background()
 	godotenv.Load()
 
-	lis, err := net.Listen("tcp", ":50051")
+	lis, err := net.Listen("tcp", ":50052")
 	if err != nil {
 		log.Panicf("Error starting server: %v", err)
 	}
