@@ -12,6 +12,17 @@ type serviceHandler struct {
 }
 
 func (h *serviceHandler) SayHello(ctx context.Context, req *service.HelloRequest) (*service.HelloResponse, error) {
+	validationErrors, err := utils.CheckValidations(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if validationErrors != nil {
+		return &service.HelloResponse{
+			Base: utils.ValidationErrorResponse(validationErrors),
+		}, nil
+	}
+
 	return &service.HelloResponse{
 		Message: fmt.Sprintf("Hello %s", req.Name),
 		Base:    utils.SuccessResponse("Successfully processed request"),
