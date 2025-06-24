@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"github.com/aldngrha/ecommerce-be/internal/handler"
+	"github.com/aldngrha/ecommerce-be/internal/repository"
+	"github.com/aldngrha/ecommerce-be/internal/service"
 	grpcmiddleware "github.com/aldngrha/ecommerce-be/middleware/grpc"
-	"github.com/aldngrha/ecommerce-be/pb/service"
+	"github.com/aldngrha/ecommerce-be/pb/auth"
 	"github.com/aldngrha/ecommerce-be/pkg/database"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
@@ -23,10 +25,12 @@ func main() {
 		log.Panicf("Error starting server: %v", err)
 	}
 
-	database.ConnectionDB(ctx, os.Getenv("DB_URI"))
+	db := database.ConnectionDB(ctx, os.Getenv("DB_URI"))
 	log.Println("Connected to database successfully")
 
-	serviceHandler := handler.NewServiceHandler()
+	authRepository := repository.NewAuthRepository(db)
+	authService := service.NewAuthService(authRepository)
+	authHandler := handler.NewAuthHandler(authService)
 
 	serv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
@@ -34,14 +38,14 @@ func main() {
 		),
 	)
 
-	service.RegisterHelloWorldServiceServer(serv, serviceHandler)
+	auth.RegisterAuthServiceServer(serv, authHandler)
 
 	if os.Getenv("ENVIRONMENT") == "dev" {
 		reflection.Register(serv)
-		log.Println("Reflection registered for HelloWorldService")
+		log.Println("Reflection registered")
 	}
 
-	log.Println("Server is starting on port :50051...")
+	log.Println("Server is starting on port :50052...")
 
 	if err := serv.Serve(lis); err != nil {
 		log.Panicf("Error serving: %v", err)
