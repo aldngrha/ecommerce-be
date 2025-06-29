@@ -3,26 +3,32 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/aldngrha/ecommerce-be/internal/entity"
 	"github.com/aldngrha/ecommerce-be/internal/repository"
 	"github.com/aldngrha/ecommerce-be/internal/utils"
 	"github.com/aldngrha/ecommerce-be/pb/auth"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"os"
+	"strings"
 	"time"
 )
 
 type IAuthService interface {
 	Register(ctx context.Context, req *auth.RegisterRequest) (*auth.RegisterResponse, error)
 	Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error)
+	Logout(ctx context.Context, req *auth.LogoutRequest) (*auth.LogoutResponse, error)
 }
 
 type authService struct {
 	authRepository repository.IAuthRepository
+	cacheService   *gocache.Cache
 }
 
 func (s *authService) Register(ctx context.Context, req *auth.RegisterRequest) (*auth.RegisterResponse, error) {
@@ -98,8 +104,8 @@ func (s *authService) Login(ctx context.Context, req *auth.LoginRequest) (*auth.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, entity.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.Id,
-			IssuedAt:  jwt.NewNumericDate(now.Add(time.Hour * 24)),
-			ExpiresAt: jwt.NewNumericDate(now),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour * 24)),
 		},
 		Email:    user.Email,
 		FullName: user.FullName,
@@ -120,8 +126,70 @@ func (s *authService) Login(ctx context.Context, req *auth.LoginRequest) (*auth.
 
 }
 
-func NewAuthService(authRepository repository.IAuthRepository) IAuthService {
+func (s *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*auth.LogoutResponse, error) {
+	// get token from metadata grpc
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "no metadata found in context")
+	}
+
+	bearerToken, ok := md["authorization"]
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "no authorization token found in metadata")
+	}
+
+	if len(bearerToken) == 0 {
+		return nil, status.Errorf(codes.Unauthenticated, "authorization token is empty")
+	}
+
+	tokenSplit := strings.Split(bearerToken[0], " ")
+
+	if len(tokenSplit) != 2 {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid authorization token format")
+	}
+
+	if tokenSplit[0] != "Bearer" {
+		return nil, status.Errorf(codes.Unauthenticated, "authorization token must start with Bearer")
+
+	}
+
+	jwtToken := tokenSplit[1]
+
+	// return token
+	tokenClaims, err := jwt.ParseWithClaims(jwtToken, &entity.JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method %v", token.Header["alg"])
+		}
+		// return secret key
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+
+	if err != nil {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
+	}
+
+	if !tokenClaims.Valid {
+		return nil, status.Errorf(codes.Unauthenticated, "token is not valid")
+	}
+
+	var claims *entity.JwtClaims
+	if claims, ok = tokenClaims.Claims.(*entity.JwtClaims); !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "invalid token claims")
+	}
+
+	// insert token to memory cache or database to invalidate the token
+	s.cacheService.Set(jwtToken, "", time.Duration(claims.ExpiresAt.Time.Unix()-time.Now().Unix())*time.Second)
+
+	// send response
+
+	return &auth.LogoutResponse{
+		Base: utils.SuccessResponse("Logout successful"),
+	}, nil
+}
+
+func NewAuthService(authRepository repository.IAuthRepository, cacheService *gocache.Cache) IAuthService {
 	return &authService{
 		authRepository: authRepository,
+		cacheService:   cacheService,
 	}
 }

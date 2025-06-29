@@ -9,6 +9,7 @@ import "buf/validate/validate.proto";
 service AuthService {
   rpc Register (RegisterRequest) returns (RegisterResponse);
   rpc Login (LoginRequest) returns (LoginResponse);
+  rpc Logout (LogoutRequest) returns (LogoutResponse);
 }
 
 message RegisterRequest {
@@ -34,6 +35,8 @@ message RegisterResponse {
   common.BaseResponse base = 1;
 }
 
+message LogoutRequest {}
+
 message LoginRequest {
   string email = 1 [(buf.validate.field).string = { email: true,
     min_len: 1,
@@ -48,4 +51,8 @@ message LoginRequest {
 message LoginResponse {
   common.BaseResponse base = 1;
   string access_token = 2;
+}
+
+message LogoutResponse {
+  common.BaseResponse base = 1;
 }
