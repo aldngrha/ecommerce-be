@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/aldngrha/ecommerce-be/internal/entity"
+	jwtentity "github.com/aldngrha/ecommerce-be/internal/entity/jwt"
 	"github.com/aldngrha/ecommerce-be/internal/repository"
 	"github.com/aldngrha/ecommerce-be/internal/utils"
 	"github.com/aldngrha/ecommerce-be/pb/auth"
@@ -13,10 +13,8 @@ import (
 	gocache "github.com/patrickmn/go-cache"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -101,7 +99,7 @@ func (s *authService) Login(ctx context.Context, req *auth.LoginRequest) (*auth.
 
 	// generate JWT token
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, entity.JwtClaims{
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtentity.JwtClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.Id,
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -127,58 +125,21 @@ func (s *authService) Login(ctx context.Context, req *auth.LoginRequest) (*auth.
 }
 
 func (s *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*auth.LogoutResponse, error) {
-	// get token from metadata grpc
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return nil, status.Errorf(codes.Unauthenticated, "no metadata found in context")
+	// get token from metadata grpcmiddleware
+	jwtToken, err := jwtentity.ParseTokenFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	bearerToken, ok := md["authorization"]
-	if !ok {
-		return nil, status.Errorf(codes.Unauthenticated, "no authorization token found in metadata")
+	tokenClaims, err := jwtentity.GetClaimsFromToken(jwtToken)
+	if err != nil {
+		return nil, err
 	}
-
-	if len(bearerToken) == 0 {
-		return nil, status.Errorf(codes.Unauthenticated, "authorization token is empty")
-	}
-
-	tokenSplit := strings.Split(bearerToken[0], " ")
-
-	if len(tokenSplit) != 2 {
-		return nil, status.Errorf(codes.Unauthenticated, "invalid authorization token format")
-	}
-
-	if tokenSplit[0] != "Bearer" {
-		return nil, status.Errorf(codes.Unauthenticated, "authorization token must start with Bearer")
-
-	}
-
-	jwtToken := tokenSplit[1]
 
 	// return token
-	tokenClaims, err := jwt.ParseWithClaims(jwtToken, &entity.JwtClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method %v", token.Header["alg"])
-		}
-		// return secret key
-		return []byte(os.Getenv("JWT_SECRET")), nil
-	})
-
-	if err != nil {
-		return nil, status.Errorf(codes.Unauthenticated, "invalid token: %v", err)
-	}
-
-	if !tokenClaims.Valid {
-		return nil, status.Errorf(codes.Unauthenticated, "token is not valid")
-	}
-
-	var claims *entity.JwtClaims
-	if claims, ok = tokenClaims.Claims.(*entity.JwtClaims); !ok {
-		return nil, status.Errorf(codes.Unauthenticated, "invalid token claims")
-	}
 
 	// insert token to memory cache or database to invalidate the token
-	s.cacheService.Set(jwtToken, "", time.Duration(claims.ExpiresAt.Time.Unix()-time.Now().Unix())*time.Second)
+	s.cacheService.Set(jwtToken, "", time.Duration(tokenClaims.ExpiresAt.Time.Unix()-time.Now().Unix())*time.Second)
 
 	// send response
 

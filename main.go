@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	grpcmiddleware2 "github.com/aldngrha/ecommerce-be/internal/grpcmiddleware"
 	"github.com/aldngrha/ecommerce-be/internal/handler"
 	"github.com/aldngrha/ecommerce-be/internal/repository"
 	"github.com/aldngrha/ecommerce-be/internal/service"
-	grpcmiddleware "github.com/aldngrha/ecommerce-be/middleware/grpc"
 	"github.com/aldngrha/ecommerce-be/pb/auth"
 	"github.com/aldngrha/ecommerce-be/pkg/database"
 	"github.com/joho/godotenv"
@@ -32,13 +32,16 @@ func main() {
 
 	cacheService := gocache.New(time.Hour*24, time.Hour)
 
+	authMiddleware := grpcmiddleware2.NewAuthMiddleware(cacheService)
+
 	authRepository := repository.NewAuthRepository(db)
 	authService := service.NewAuthService(authRepository, cacheService)
 	authHandler := handler.NewAuthHandler(authService)
 
 	serv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			grpcmiddleware.ErrorMiddleware,
+			grpcmiddleware2.ErrorMiddleware,
+			authMiddleware.Middleware,
 		),
 	)
 
