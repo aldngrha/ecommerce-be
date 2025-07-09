@@ -22,6 +22,7 @@ type IAuthService interface {
 	Register(ctx context.Context, req *auth.RegisterRequest) (*auth.RegisterResponse, error)
 	Login(ctx context.Context, req *auth.LoginRequest) (*auth.LoginResponse, error)
 	Logout(ctx context.Context, req *auth.LogoutRequest) (*auth.LogoutResponse, error)
+	ChangePassword(ctx context.Context, req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error)
 }
 
 type authService struct {
@@ -145,6 +146,58 @@ func (s *authService) Logout(ctx context.Context, req *auth.LogoutRequest) (*aut
 
 	return &auth.LogoutResponse{
 		Base: utils.SuccessResponse("Logout successful"),
+	}, nil
+}
+
+func (s *authService) ChangePassword(ctx context.Context, req *auth.ChangePasswordRequest) (*auth.ChangePasswordResponse, error) {
+	if req.NewPassword != req.ConfirmNewPassword {
+		return &auth.ChangePasswordResponse{
+			Base: utils.BadRequestResponse("New password and confirm new password do not match"),
+		}, nil
+	}
+
+	jwtToken, err := jwtentity.ParseTokenFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	claims, err := jwtentity.GetClaimsFromToken(jwtToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := s.authRepository.GetUserByEmail(ctx, claims.Email)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return &auth.ChangePasswordResponse{
+			Base: utils.BadRequestResponse("User with this email does not exist"),
+		}, nil
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return &auth.ChangePasswordResponse{
+				Base: utils.BadRequestResponse("Invalid old password"),
+			}, nil
+		}
+		return nil, err // return error if there is an issue with comparing passwords
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 10)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.authRepository.UpdateUserPassword(ctx, user.Id, string(hashedPassword), user.FullName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &auth.ChangePasswordResponse{
+		Base: utils.SuccessResponse("Password changed successfully"),
 	}, nil
 }
 
