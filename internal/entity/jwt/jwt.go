@@ -48,3 +48,13 @@ func GetClaimsFromToken(jwtToken string) (*JwtClaims, error) {
 
 	return nil, status.Errorf(codes.Unauthenticated, "token is not valid")
 }
+
+func GetClaimsFromContext(ctx context.Context) (*JwtClaims, error) {
+	claims, ok := ctx.Value(JwtEntityContextKeyValue).(*JwtClaims)
+
+	if !ok {
+		return nil, status.Errorf(codes.Unauthenticated, "unauthenticated: no JWT claims found in context")
+	}
+
+	return claims, nil
+}
