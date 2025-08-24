@@ -2,20 +2,22 @@ package main
 
 import (
 	"context"
+	"log"
+	"net"
+	"os"
+	"time"
+
 	grpcmiddleware2 "github.com/aldngrha/ecommerce-be/internal/grpcmiddleware"
 	"github.com/aldngrha/ecommerce-be/internal/handler"
 	"github.com/aldngrha/ecommerce-be/internal/repository"
 	"github.com/aldngrha/ecommerce-be/internal/service"
 	"github.com/aldngrha/ecommerce-be/pb/auth"
+	"github.com/aldngrha/ecommerce-be/pb/product"
 	"github.com/aldngrha/ecommerce-be/pkg/database"
 	"github.com/joho/godotenv"
 	gocache "github.com/patrickmn/go-cache"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"log"
-	"net"
-	"os"
-	"time"
 )
 
 func main() {
@@ -38,6 +40,10 @@ func main() {
 	authService := service.NewAuthService(authRepository, cacheService)
 	authHandler := handler.NewAuthHandler(authService)
 
+	productRepository := repository.NewProductRepository(db)
+	productService := service.NewProductService(productRepository)
+	productHandler := handler.NewProductHandler(productService)
+
 	serv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			grpcmiddleware2.ErrorMiddleware,
@@ -46,6 +52,7 @@ func main() {
 	)
 
 	auth.RegisterAuthServiceServer(serv, authHandler)
+	product.RegisterProductServiceServer(serv, productHandler)
 
 	if os.Getenv("ENVIRONMENT") == "dev" {
 		reflection.Register(serv)
