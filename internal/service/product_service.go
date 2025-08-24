@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aldngrha/ecommerce-be/internal/entity"
@@ -36,6 +38,15 @@ func (ps *productService) CreateProduct(ctx context.Context, req *product.Create
 	}
 
 	// check if image exists
+	imagePath := filepath.Join("storage", "images", "products", req.ImageFileName)
+	_, err = os.Stat(imagePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &product.CreateProductResponse{
+				Base: utils.BadRequestResponse("image file not found"),
+			}, nil
+		}
+	}
 
 	// insert to db
 
