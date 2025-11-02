@@ -18,6 +18,7 @@ import (
 type IProductService interface {
 	CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*product.CreateProductResponse, error)
 	DetailProduct(ctx context.Context, request *product.DetailProductRequest) (*product.DetailProductResponse, error)
+	EditProduct(ctx context.Context, request *product.EditProductRequest) (*product.EditProductResponse, error)
 }
 
 type productService struct {
@@ -97,6 +98,74 @@ func (ps *productService) DetailProduct(ctx context.Context, req *product.Detail
 		Description:  productEntity.Description,
 		Price:        productEntity.Price,
 		ImageFileUrl: fmt.Sprintf("%s/images/products/%s", os.Getenv("STORAGE_SERVICE_URL"), productEntity.ImageFileName),
+	}, nil
+}
+
+func (ps *productService) EditProduct(ctx context.Context, request *product.EditProductRequest) (*product.EditProductResponse, error) {
+	claims, err := jwtentity.GetClaimsFromContext(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims.Role != entity.UserRoleAdmin {
+		return &product.EditProductResponse{
+			Base: utils.BadRequestResponse("only admin can update product"),
+		}, nil
+	}
+
+	// validate if id available on db
+	productEntity, err := ps.productRepository.GetProductById(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	if productEntity == nil {
+		return &product.EditProductResponse{
+			Base: utils.NotFoundResponse("Product not found"),
+		}, nil
+	}
+
+	// if image change, remove old image
+	if productEntity.ImageFileName != request.ImageFileName {
+		newImagePath := filepath.Join("storage", "images", "products", request.ImageFileName)
+		_, err := os.Stat(newImagePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return &product.EditProductResponse{
+					Base: utils.NotFoundResponse("Image not found"),
+				}, nil
+			}
+			return nil, err
+		}
+
+		oldImagePath := filepath.Join("storage", "images", "products", productEntity.ImageFileName)
+		err = os.Remove(oldImagePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// update db
+	newProduct := entity.Product{
+		Id:            request.Id,
+		Name:          request.Name,
+		Description:   request.Description,
+		Price:         request.Price,
+		ImageFileName: request.ImageFileName,
+		UpdatedAt:     time.Now(),
+		UpdatedBy:     &claims.FullName,
+	}
+
+	err = ps.productRepository.UpdateProduct(ctx, &newProduct)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// send response
+	return &product.EditProductResponse{
+		Base: utils.SuccessResponse("Edit product successfully"),
+		Id:   request.Id,
 	}, nil
 }
 
