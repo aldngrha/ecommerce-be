@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 type IProductService interface {
 	CreateProduct(ctx context.Context, req *product.CreateProductRequest) (*product.CreateProductResponse, error)
+	DetailProduct(ctx context.Context, request *product.DetailProductRequest) (*product.DetailProductResponse, error)
 }
 
 type productService struct {
@@ -71,6 +73,30 @@ func (ps *productService) CreateProduct(ctx context.Context, req *product.Create
 	return &product.CreateProductResponse{
 		Base: utils.SuccessResponse("Product created successfully"),
 		Id:   productEntity.Id,
+	}, nil
+}
+
+func (ps *productService) DetailProduct(ctx context.Context, req *product.DetailProductRequest) (*product.DetailProductResponse, error) {
+	// query to db with data id
+	productEntity, err := ps.productRepository.GetProductById(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	// if null, return not found
+	if productEntity == nil {
+		return &product.DetailProductResponse{
+			Base: utils.NotFoundResponse("Product not found"),
+		}, nil
+	}
+
+	// send response
+	return &product.DetailProductResponse{
+		Base:         utils.SuccessResponse("Get product detail successfully"),
+		Id:           productEntity.Id,
+		Name:         productEntity.Name,
+		Description:  productEntity.Description,
+		Price:        productEntity.Price,
+		ImageFileUrl: fmt.Sprintf("%s/images/products/%s", os.Getenv("STORAGE_SERVICE_URL"), productEntity.ImageFileName),
 	}, nil
 }
 
